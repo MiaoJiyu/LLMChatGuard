@@ -9,6 +9,8 @@ import fi.iki.elonen.NanoHTTPD;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.logging.Level;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -38,10 +40,30 @@ public class WebServer extends NanoHTTPD {
 
     @Override
     public Response serve(IHTTPSession session) {
+        try {
+            return doServe(session);
+        } catch (Exception e) {
+            // 任何单请求处理异常都记录并返回 500，避免整个 Web 面板被拖垮（端口保持可访问）
+            plugin.getLogger().log(Level.SEVERE,
+                    "Web 请求处理异常: " + session.getUri(), e);
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
+                    "text/plain; charset=utf-8", "Internal Server Error");
+        }
+    }
+
+    private Response doServe(IHTTPSession session) {
         sessions.purge();
         String uri = session.getUri();
-        String cookie = session.getCookies().read("cm_sid");
-        boolean authed = sessions.isValid(cookie);
+        AuthInfo auth = resolveAuth(session);
+        boolean authed = auth.valid;
+
+        // 受保护路由：未认证则重定向到登录页，并打印诊断信息
+        if ((uri.equals("/logs") || uri.equals("/punishments")) && !authed) {
+            plugin.getLogger().warning("[" + uri + "] 未认证，重定向至 /login。"
+                    + " rawCookie=" + mask(auth.rawCookie) + " 解析到的 cm_sid=" + auth.ids
+                    + " 有效会话=" + auth.valid);
+            return redirect("/login");
+        }
 
         if (uri.equals("/") || uri.equals("/index.html")) {
             return dashboard(authed);
@@ -50,7 +72,6 @@ public class WebServer extends NanoHTTPD {
             return punishments(session, authed);
         }
         if (uri.equals("/logs")) {
-            if (!authed) return redirect("/login");
             return logs(session);
         }
         if (uri.equals("/login")) {
@@ -60,7 +81,7 @@ public class WebServer extends NanoHTTPD {
             return loginPage();
         }
         if (uri.equals("/logout")) {
-            sessions.destroy(cookie);
+            sessions.destroy(auth.validId);
             return redirect("/");
         }
         if (uri.equals("/static/style.css")) {
@@ -71,12 +92,13 @@ public class WebServer extends NanoHTTPD {
 
     private Response dashboard(boolean authed) {
         ModeDecider.DetectMode mode = plugin.getModeDecider().getCachedMode();
+        int[] stats = plugin.getModeDecider().computeLiveStats();
         Map<String, String> p = new HashMap<>();
         p.put("SERVER_NAME", plugin.getConfigManager().getServerName());
         p.put("MODE_BADGE", modeBadge(mode));
-        p.put("ONLINE", String.valueOf(plugin.getModeDecider().getCachedOnline()));
-        p.put("ACTIVE_OP", String.valueOf(plugin.getModeDecider().getCachedActiveOp()));
-        p.put("QUEUE", String.valueOf(plugin.getModelClient().getQueueWaiting()));
+        p.put("ONLINE", String.valueOf(stats[0]));
+        p.put("ACTIVE_OP", String.valueOf(stats[1]));
+        p.put("QUEUE", String.valueOf(plugin.getDetectionManager().getQueueSize()));
         p.put("DATA_DIR", plugin.getDataFolder().getAbsolutePath());
         p.put("LOGIN_STATUS", loginStatus(authed));
 
@@ -185,12 +207,14 @@ public class WebServer extends NanoHTTPD {
         if (sessions.login(user, pass)) {
             String id = sessions.createSession();
             Response r = redirect("/");
-            // 使用 Expires（RFC1123）设置过期时间，兼容所有客户端；同时 HttpOnly 防脚本读取
-            long expireMs = System.currentTimeMillis()
-                    + (long) plugin.getConfigManager().getWebAdminSessionTimeoutMinutes() * 60_000;
+            // Max-Age（浏览器通用）与 Expires（兼容旧客户端）双写；Expires 时区必须固定为 GMT，
+            // 否则浏览器会拒绝该 Cookie（之前用 JVM 默认时区导致登录后依然未认证）。
+            long maxAgeSec = (long) plugin.getConfigManager().getWebAdminSessionTimeoutMinutes() * 60;
+            long expireMs = System.currentTimeMillis() + maxAgeSec * 1000;
             String expires = new java.text.SimpleDateFormat(
-                    "EEE, dd MMM yyyy HH:mm:ss z", java.util.Locale.US).format(new Date(expireMs));
-            r.addHeader("Set-Cookie", "cm_sid=" + id + "; Path=/; HttpOnly; SameSite=Lax; Expires=" + expires);
+                    "EEE, dd MMM yyyy HH:mm:ss 'GMT'", java.util.Locale.US).format(new Date(expireMs));
+            r.addHeader("Set-Cookie", "cm_sid=" + id
+                    + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=" + maxAgeSec + "; Expires=" + expires);
             return r;
         }
         Map<String, String> p = new HashMap<>();
@@ -264,8 +288,65 @@ public class WebServer extends NanoHTTPD {
         return tpl;
     }
 
-    private String readResource(String name) {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("web/" + name)) {
+    /** 认证解析结果：原始 Cookie 头、解析到的全部 cm_sid 值、是否存在有效会话。 */
+    private static final class AuthInfo {
+        final String rawCookie;
+        final List<String> ids;
+        final boolean valid;
+        final String validId;
+        AuthInfo(String rawCookie, List<String> ids, boolean valid, String validId) {
+            this.rawCookie = rawCookie;
+            this.ids = ids;
+            this.valid = valid;
+            this.validId = validId;
+        }
+    }
+
+    /**
+     * 解析认证状态：从 Cookie 头取出全部 cm_sid（可能同时存在新旧两个，
+     * 例如重启/重新登录后浏览器保留了过期会话 id），逐一校验，命中任一有效会话即视为已认证。
+     * 若手动解析为空，回退到 NanoHTTPD 的 CookieHandler，提升兼容性。
+     */
+    private AuthInfo resolveAuth(IHTTPSession session) {
+        String raw = session.getHeaders().get("cookie");
+        List<String> ids = parseCookieValues(raw, "cm_sid");
+        if (ids.isEmpty()) {
+            String legacy = session.getCookies().read("cm_sid");
+            if (legacy != null && !legacy.isEmpty()) ids.add(legacy);
+        }
+        for (String id : ids) {
+            if (sessions.isValid(id)) {
+                return new AuthInfo(raw, ids, true, id);
+            }
+        }
+        return new AuthInfo(raw, ids, false, null);
+    }
+
+    /** 解析 Cookie 头，返回指定名称的全部值（按出现顺序，后者为较新设置）。 */
+    private static List<String> parseCookieValues(String header, String name) {
+        List<String> out = new ArrayList<>();
+        if (header == null) return out;
+        for (String part : header.split(";")) {
+            String trimmed = part.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq <= 0) continue;
+            if (!name.equals(trimmed.substring(0, eq).trim())) continue;
+            String v = trimmed.substring(eq + 1).trim();
+            if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) {
+                v = v.substring(1, v.length() - 1);
+            }
+            out.add(v);
+        }
+        return out;
+    }
+
+    /** 仅保留前缀用于日志，避免泄露完整会话 id。 */
+    private static String mask(String s) {
+        if (s == null) return "null";
+        return s.length() <= 12 ? s : s.substring(0, 12) + "…(len=" + s.length() + ")";
+    }
+
+    private String readResource(String name) {        try (InputStream in = getClass().getClassLoader().getResourceAsStream("web/" + name)) {
             if (in == null) return "";
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {

@@ -30,11 +30,14 @@ cp target/ChatModerator.jar <你的服务端>/plugins/
   "top_p": 1.0,
   "top_k": 0,
   "thinking": false,
-  "timeout_seconds": 30
+  "timeout_seconds": 120,
+  "stream": false
 }
 ```
 
 > `top_k` 保持 `0`、`thinking` 保持 `false` 可兼容 OpenAI；接入支持这些字段的接口时再按需开启。
+> 若使用 **SiliconFlow（如 Qwen3）** 并要开启思考，需设 `"thinking": true` 且 `"thinking_param": "enable_thinking"`，否则会因未知参数 `thinking` 被拒（HTTP 400）；本插件会在被拒时自动降级。
+> 模型响应较慢（含思考过程）时，把 `stream` 改为 `true`，并将 `timeout_seconds` 调大（如 180），可避免因整体超时失败。
 
 ## 4. 维护词库与密码
 

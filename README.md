@@ -98,6 +98,12 @@ punishment_command: "/ban {playerName} 您触发了{serverName}违禁词自动�
 
 max_concurrent_requests: 5
 retry_count: 0
+
+# 批量检测调度（非调试模式）：聊天先入队，按固定间隔合并为一次模型请求
+batch_interval_seconds: 5              # 每隔多少秒把队列里的对话批量发送给大模型检测
+max_batch_size: 20                     # 每一批最多合并的消息条数
+debug: false                           # true 时无视不检测条件，每句话立即单条检测（排查用）
+
 failure_policy: "pass"                 # pass=解析失败/超时放行；local=用本地关键词兜底检测+处罚
 
 log_retention_days: 7
@@ -126,13 +132,17 @@ web_admin:
   "top_p": 1.0,
   "top_k": 0,
   "thinking": false,
-  "timeout_seconds": 30,
+  "rpm": 20,                            # 速率上限：批量发送时每分钟最多 rpm 次请求（令牌桶）
+  "timeout_seconds": 120,               # 单次请求超时（秒）；流式模式下仅约束"连接+首字节"，主体按空闲超时读取
+  "stream": false,                      # true=流式（SSE）输出，慢模型/思考模型建议开启，自动截去 <think:6124c78e>…</think:6124c78e>
   "system_prompt_template": "prompts/default_prompt.txt"
 }
 ```
 
 - `top_k`：仅当 **> 0** 时才会发送到 API（OpenAI 等不接受该字段，留 0 即不发送）。
-- `thinking`：仅当 **true** 时发送（推理模型专用）。
+- `thinking`：仅当 **true** 时发送思考开关（推理模型专用）。
+- `thinking_param`：思考参数的**真实字段名**，因提供方而异。OpenAI/DeepSeek 用 `thinking`；**SiliconFlow（如 Qwen3）用 `enable_thinking`**。配错会导致 HTTP 400，服务端拒绝时本插件会自动降级（移除该参数后重试）。
+- `timeout_seconds`：非流式下约束整次响应；流式下仅约束连接与首字节，主体按"空闲超时"读取，因此慢模型请开启 `stream: true` 并视情况调大此值。
 - `system_prompt_template`：可选；不填则回退到 `config.yaml` 的 `custom_prompt_template`，再不填用内置默认提示词。
 
 ### 6.3 自定义提示词（关键特性）
@@ -156,6 +166,17 @@ web_admin:
 失败策略 `failure_policy`：
 - `pass`：解析失败 / 超时 → 视为未命中（放行）。
 - `local`：解析失败 / 超时 → 用本地关键词兜底检测，命中则处罚（记录实际命中词）。
+
+## 7.1 批量检测、速率上限与调试模式
+
+检测流程默认采用**批量**模式（需求新增）：
+
+- **排队**：聊天消息经模式决策（STOP/SAMPLE/FULL）后，被选中的消息进入内存队列，不再逐条即时请求。
+- **定时批量**：`DetectionManager` 每 `batch_interval_seconds` 秒从队列取出至多 `max_batch_size` 条，合并为**一次**模型请求（提示词改为要求返回与消息顺序对应的 JSON 数组），结果逐条回写日志/处罚/失败兜底。
+- **速率上限（rpm）**：每次批量发送受 `models/*.json` 中 `rpm`（每分钟请求数）约束，采用令牌桶限速；若当前窗口已超限，本批消息退回队列、下个周期再试。
+- **调试模式**：`config.yaml` 中 `debug: true` 时，**无视 STOP/抽样等不检测条件**，每句话立即以单条请求检测，便于排查提示词与模型行为。
+
+> 提示：批量模式下处罚存在秒级延迟（最多约一个 `batch_interval_seconds`）。`/chatmod test` 与 `debug` 模式仍为即时单条检测。
 
 ---
 

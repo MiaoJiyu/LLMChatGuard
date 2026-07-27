@@ -13,11 +13,16 @@ sample_rate: 0.5
 sampling_strategy: "probability"   # probability 或 fixed_players
 
 # 处罚命令模板（变量：{playerName} {serverName} {bannedWords} {reason}）
-punishment_command: "/ban {playerName} 您触发了{serverName}违禁词自动检测系统，被处以封禁惩罚。【此处罚由系统自动处理】"
+punishment_command: "ban {playerName} 您触发了{serverName}违禁词自动检测系统，被处以封禁惩罚。【此处罚由系统自动处理】"
 
 # API 调用控制
 max_concurrent_requests: 5
 retry_count: 0
+
+# 批量检测调度（非调试模式）：聊天消息先入队，按固定间隔合并为一次模型请求
+batch_interval_seconds: 5    # 每隔多少秒把队列里的对话批量发送给大模型检测
+max_batch_size: 20          # 每一批最多合并的消息条数
+debug: false                # true 时无视不检测条件（STOP/抽样），每句话立即单条检测，便于排查
 
 # 失败策略：pass（放行）或 local（本地关键词兜底检测）
 failure_policy: "pass"

@@ -71,6 +71,20 @@ public class ModeDecider {
         return cachedActiveOp;
     }
 
+    /** 实时统计当前在线玩家与活跃 OP（不触发模式切换日志，供 Web 面板使用）。 */
+    public int[] computeLiveStats() {
+        int online = 0;
+        int activeOp = 0;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isNpc(p)) continue;
+            online++;
+            if (p.isOp() && !plugin.getAfkManager().isAfk(p)) {
+                activeOp++;
+            }
+        }
+        return new int[]{online, activeOp};
+    }
+
     private boolean isNpc(Player p) {
         return p.hasMetadata("NPC") || p.hasMetadata("npc");
     }

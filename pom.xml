@@ -110,6 +110,20 @@
                                     <exclude>org.spigotmc:*</exclude>
                                 </excludes>
                             </artifactSet>
+                            <!-- 剥离被 shade 依赖自带的签名文件，否则插件加载时
+                                 报 "Invalid signature file digest for Manifest main attributes" -->
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/*.EC</exclude>
+                                        <exclude>META-INF/INDEX.LIST</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>fi.iki.elonen</pattern>

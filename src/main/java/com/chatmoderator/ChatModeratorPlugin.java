@@ -2,6 +2,7 @@ package com.chatmoderator;
 
 import com.chatmoderator.afk.AFKManager;
 import com.chatmoderator.command.CommandHandler;
+import com.chatmoderator.detection.DetectionManager;
 import com.chatmoderator.config.ConfigManager;
 import com.chatmoderator.config.ModelConfig;
 import com.chatmoderator.listener.ChatListener;
@@ -32,6 +33,7 @@ public class ChatModeratorPlugin extends JavaPlugin {
     private AFKManager afkManager;
     private ModeDecider modeDecider;
     private ModelClient modelClient;
+    private DetectionManager detectionManager;
     private PunishmentExecutor punishmentExecutor;
     private LogManager logManager;
     private QueryService queryService;
@@ -58,6 +60,9 @@ public class ChatModeratorPlugin extends JavaPlugin {
 
         modelClient = new ModelClient(this);
         modelClient.init();
+
+        detectionManager = new DetectionManager(this);
+        detectionManager.start();
 
         punishmentExecutor = new PunishmentExecutor(this);
 
@@ -97,6 +102,7 @@ public class ChatModeratorPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (detectionManager != null) detectionManager.stop();
         if (modelClient != null) modelClient.shutdown();
         if (logManager != null) logManager.stop();
         if (webServer != null) {
@@ -114,6 +120,7 @@ public class ChatModeratorPlugin extends JavaPlugin {
         wordFilter.load();
         models = ModelConfig.loadAll(new File(getDataFolder(), "models"));
         afkManager.setAfkTimeoutMinutes(configManager.getAfkTimeoutMinutes());
+        if (detectionManager != null) detectionManager.restart();
         logManager.logReload("配置热重载完成");
         getLogger().info("热重载完成");
     }
@@ -131,8 +138,12 @@ public class ChatModeratorPlugin extends JavaPlugin {
         sender.sendMessage("在线玩家: " + modeDecider.getCachedOnline());
         sender.sendMessage("活跃 OP: " + modeDecider.getCachedActiveOp());
         sender.sendMessage("词库大小: " + wordFilter.size());
-        sender.sendMessage("队列等待: " + modelClient.getQueueWaiting());
-        sender.sendMessage("当前模型: " + configManager.getModel());
+        ModelConfig am = getActiveModel();
+        sender.sendMessage("检测队列: " + detectionManager.getQueueSize() + " 条（批量间隔 "
+                + configManager.getBatchIntervalSeconds() + "s，最大批 " + configManager.getMaxBatchSize() + "）");
+        sender.sendMessage("调试模式: " + (configManager.isDebug() ? "开（逐条即时检测）" : "关")
+                + " | 当前模型: " + configManager.getModel()
+                + (am != null ? " (rpm=" + am.rpm + ")" : ""));
     }
 
     /** 模拟检测某玩家消息并返回结果。 */
@@ -176,6 +187,7 @@ public class ChatModeratorPlugin extends JavaPlugin {
     public AFKManager getAfkManager() { return afkManager; }
     public ModeDecider getModeDecider() { return modeDecider; }
     public ModelClient getModelClient() { return modelClient; }
+    public DetectionManager getDetectionManager() { return detectionManager; }
     public PunishmentExecutor getPunishmentExecutor() { return punishmentExecutor; }
     public LogManager getLogManager() { return logManager; }
     public QueryService getQueryService() { return queryService; }

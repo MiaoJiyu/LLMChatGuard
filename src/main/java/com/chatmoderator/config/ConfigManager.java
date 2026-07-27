@@ -36,6 +36,9 @@ public class ConfigManager {
     // Web 面板会在 onEnable 阶段被禁用并要求管理员手动设置（见 ChatModeratorPlugin）。
     private String webAdminPassword = "";
     private int webAdminSessionTimeoutMinutes = 30;
+    private int batchIntervalSeconds = 5;
+    private int maxBatchSize = 20;
+    private boolean debug = false;
 
     public ConfigManager(ChatModeratorPlugin plugin) {
         this.plugin = plugin;
@@ -75,6 +78,9 @@ public class ConfigManager {
             logArchiveHour = getInt("log_archive_hour", logArchiveHour);
             webPort = getInt("web_port", webPort);
             webBindAddress = get("web_bind_address", webBindAddress);
+            batchIntervalSeconds = getInt("batch_interval_seconds", batchIntervalSeconds);
+            maxBatchSize = getInt("max_batch_size", maxBatchSize);
+            debug = getBoolean("debug", debug);
 
             Object adminObj = root.get("web_admin");
             if (adminObj instanceof Map) {
@@ -130,6 +136,13 @@ public class ConfigManager {
         }
     }
 
+    private boolean getBoolean(String key, boolean def) {
+        Object v = root.get(key);
+        if (v == null) return def;
+        if (v instanceof Boolean) return (Boolean) v;
+        return Boolean.parseBoolean(String.valueOf(v));
+    }
+
     // ---- getters ----
     public String getServerName() { return serverName; }
     public String getModel() { return model; }
@@ -158,6 +171,9 @@ public class ConfigManager {
     public String getWebAdminUsername() { return webAdminUsername; }
     public String getWebAdminPassword() { return webAdminPassword; }
     public int getWebAdminSessionTimeoutMinutes() { return webAdminSessionTimeoutMinutes; }
+    public int getBatchIntervalSeconds() { return batchIntervalSeconds; }
+    public int getMaxBatchSize() { return maxBatchSize; }
+    public boolean isDebug() { return debug; }
 
     /** 密码是否为 BCrypt 哈希（以 $2a$/$2b$/$2y$ 开头）。 */
     public boolean isPasswordHashed() {

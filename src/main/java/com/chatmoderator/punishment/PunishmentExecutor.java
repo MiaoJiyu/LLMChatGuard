@@ -28,9 +28,13 @@ public class PunishmentExecutor {
         String command = buildCommand(player.getName(), bannedWords, message);
 
         // 命令必须以控制台身份在主线程执行
-        plugin.getServer().getScheduler().runTask(plugin, () ->
-                plugin.getServer().dispatchCommand(
-                        plugin.getServer().getConsoleSender(), command));
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            boolean ok = plugin.getServer().dispatchCommand(
+                    plugin.getServer().getConsoleSender(), command);
+            if (!ok) {
+                plugin.getLogger().warning("处罚命令执行失败（命令可能不存在或权限不足）: " + command);
+            }
+        });
 
         PunishmentRecord rec = new PunishmentRecord();
         rec.timestamp = System.currentTimeMillis();
@@ -44,6 +48,29 @@ public class PunishmentExecutor {
         saveRecord(rec);
 
         plugin.getLogManager().logPunishment(player.getName(), command);
+    }
+
+    /** 以玩家名执行处罚（玩家可能已离线，无法取得 Player 对象时使用）。 */
+    public void executeByName(String playerName, List<String> bannedWords, String message) {
+        String command = buildCommand(playerName, bannedWords, message);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            boolean ok = plugin.getServer().dispatchCommand(
+                    plugin.getServer().getConsoleSender(), command);
+            if (!ok) {
+                plugin.getLogger().warning("处罚命令执行失败（命令可能不存在或权限不足）: " + command);
+            }
+        });
+        PunishmentRecord rec = new PunishmentRecord();
+        rec.timestamp = System.currentTimeMillis();
+        rec.playerUuid = "";
+        rec.playerName = playerName;
+        rec.serverName = plugin.getConfigManager().getServerName();
+        rec.bannedWords = bannedWords;
+        rec.message = message;
+        rec.command = command;
+        rec.reason = "触发违禁词自动检测";
+        saveRecord(rec);
+        plugin.getLogManager().logPunishment(playerName, command);
     }
 
     private String buildCommand(String playerName, List<String> bannedWords, String message) {

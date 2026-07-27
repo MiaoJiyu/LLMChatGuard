@@ -40,8 +40,18 @@ public class ModelConfig {
     @SerializedName("thinking")
     public boolean thinking = false;
 
+    /** 思考参数名：不同提供方不同（OpenAI/DeepSeek 用 "thinking"，SiliconFlow 用 "enable_thinking"）。 */
+    @SerializedName("thinking_param")
+    public String thinkingParam = "thinking";
+
+    @SerializedName("rpm")
+    public int rpm = 20;
+
     @SerializedName("timeout_seconds")
-    public int timeoutSeconds = 30;
+    public int timeoutSeconds = 120;
+
+    @SerializedName("stream")
+    public boolean stream = false;
 
     @SerializedName("system_prompt_template")
     public String systemPromptTemplate = "";

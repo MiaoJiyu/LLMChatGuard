@@ -1,6 +1,7 @@
 package com.chatmoderator.model;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -51,5 +52,50 @@ public class ModelResponse {
         }
         r.parsed = foundBool || foundJson;
         return r;
+    }
+
+    /**
+     * 批量解析：从模型返回文本中提取 JSON 数组，逐元素生成判定结果。
+     * 与入队的消息顺序一一对应；解析失败或数量不足时补空结果（parsed=false）。
+     */
+    public static List<ModelResponse> parseBatch(String text, int expected) {
+        List<ModelResponse> out = new ArrayList<>();
+        if (text == null) {
+            for (int i = 0; i < expected; i++) out.add(new ModelResponse());
+            return out;
+        }
+        int s = text.indexOf('[');
+        int e = text.lastIndexOf(']');
+        if (s < 0 || e < 0 || e < s) {
+            for (int i = 0; i < expected; i++) out.add(new ModelResponse());
+            return out;
+        }
+        String arrStr = text.substring(s, e + 1);
+        try {
+            JsonArray arr = JsonParser.parseString(arrStr).getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonElement el = arr.get(i);
+                ModelResponse r = new ModelResponse();
+                if (el.isJsonObject()) {
+                    JsonObject o = el.getAsJsonObject();
+                    r.parsed = true;
+                    JsonElement b = o.get("banned");
+                    if (b != null && b.isJsonPrimitive()) {
+                        r.isBanned = b.getAsBoolean();
+                    }
+                    JsonArray bw = o.getAsJsonArray("banned_words");
+                    if (bw != null) {
+                        for (int j = 0; j < bw.size(); j++) {
+                            r.bannedWords.add(bw.get(j).getAsString());
+                        }
+                    }
+                }
+                out.add(r);
+            }
+            while (out.size() < expected) out.add(new ModelResponse());
+        } catch (Exception ignored) {
+            for (int i = 0; i < expected; i++) out.add(new ModelResponse());
+        }
+        return out;
     }
 }
