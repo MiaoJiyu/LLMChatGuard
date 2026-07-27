@@ -1,0 +1,13 @@
+{
+  "model_id": "default",
+  "api_url": "https://api.openai.com/v1/chat/completions",
+  "api_key": "sk-REPLACE_ME",
+  "model_name": "gpt-4o",
+  "max_tokens": 1024,
+  "temperature": 0.2,
+  "top_p": 1.0,
+  "top_k": 20,
+  "thinking": false,
+  "timeout_seconds": 30,
+  "system_prompt_template": ""
+}

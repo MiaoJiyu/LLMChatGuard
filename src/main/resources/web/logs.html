@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{SERVER_NAME}} · 日志</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <div class="brand"><span class="dot"></span> ChatModerator · {{SERVER_NAME}}</div>
+    <div class="nav-links">
+        <a href="/">仪表盘</a>
+        <a href="/punishments">处罚记录</a>
+        <a href="/logs" class="active">日志</a>
+        {{LOGIN_STATUS}}
+    </div>
+</nav>
+<div class="container">
+    <h1 class="page-title">系统日志（管理员）</h1>
+    <p class="page-sub">聊天记录、检测结果与系统事件</p>
+
+    <form class="form-row" method="get" action="/logs">
+        <select name="type">
+            <option value="" {{TYPE_ALL}}>全部类型</option>
+            <option value="chat" {{TYPE_CHAT}}>聊天</option>
+            <option value="detection" {{TYPE_DETECTION}}>检测</option>
+            <option value="mode" {{TYPE_MODE}}>模式</option>
+            <option value="punishment" {{TYPE_PUNISHMENT}}>处罚</option>
+            <option value="error" {{TYPE_ERROR}}>错误</option>
+        </select>
+        <input type="text" name="player" placeholder="玩家名" value="{{PLAYER}}">
+        <input type="text" name="from" placeholder="起始 yyyy-MM-dd" value="{{FROM}}">
+        <input type="text" name="to" placeholder="结束 yyyy-MM-dd" value="{{TO}}">
+        <select name="result">
+            <option value="" {{RES_ALL}}>全部结果</option>
+            <option value="true" {{RES_TRUE}}>命中</option>
+            <option value="false" {{RES_FALSE}}>未命中</option>
+        </select>
+        <button type="submit">筛选</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>时间</th><th>类型</th><th>玩家</th><th>结果</th><th>内容</th></tr>
+                </thead>
+                <tbody>
+                {{ROWS}}
+                </tbody>
+            </table>
+        </div>
+        {{PAGINATION}}
+    </div>
+    <div class="footer">ChatModerator v1.0.0</div>
+</div>
+</body>
+</html>

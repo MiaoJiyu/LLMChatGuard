@@ -1,0 +1,18 @@
+name: ChatModerator
+main: com.chatmoderator.ChatModeratorPlugin
+version: 1.0.0
+api-version: "1.21"
+author: ChatModerator
+description: LLM-powered Minecraft chat moderation with customizable prompts
+website: https://github.com/chatmoderator/LLMChatGuard
+
+commands:
+  chatmod:
+    description: ChatModerator management commands
+    permission: chatmoderator.admin
+    usage: /chatmod <reload|status|test>
+
+permissions:
+  chatmoderator.admin:
+    description: Access to ChatModerator management commands
+    default: op

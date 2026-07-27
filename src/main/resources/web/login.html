@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{SERVER_NAME}} · 登录</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <div class="brand"><span class="dot"></span> ChatModerator · {{SERVER_NAME}}</div>
+    <div class="nav-links">
+        <a href="/">仪表盘</a>
+        <a href="/punishments">处罚记录</a>
+        <a href="/logs">日志</a>
+    </div>
+</nav>
+<div class="container" style="max-width: 420px;">
+    <div class="card">
+        <h1 class="page-title">管理员登录</h1>
+        <p class="page-sub">登录后可查看完整日志</p>
+        {{ERROR}}
+        <form method="post" action="/login">
+            <div class="form-row" style="flex-direction: column; align-items: stretch;">
+                <input type="text" name="username" placeholder="用户名" required>
+                <input type="password" name="password" placeholder="密码" required>
+                <button type="submit" style="margin-top: 8px;">登录</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

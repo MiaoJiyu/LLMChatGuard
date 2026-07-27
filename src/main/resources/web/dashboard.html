@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{SERVER_NAME}} · 仪表盘</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <div class="brand"><span class="dot"></span> ChatModerator · {{SERVER_NAME}}</div>
+    <div class="nav-links">
+        <a href="/" class="active">仪表盘</a>
+        <a href="/punishments">处罚记录</a>
+        <a href="/logs">日志</a>
+        {{LOGIN_STATUS}}
+    </div>
+</nav>
+<div class="container">
+    <h1 class="page-title">实时概览</h1>
+    <p class="page-sub">当前检测模式与服务器状态</p>
+
+    <div class="grid cols-4">
+        <div class="card">
+            <div class="label">检测模式</div>
+            <div class="value small">{{MODE_BADGE}}</div>
+        </div>
+        <div class="card">
+            <div class="label">在线玩家</div>
+            <div class="value">{{ONLINE}}</div>
+        </div>
+        <div class="card">
+            <div class="label">活跃 OP</div>
+            <div class="value">{{ACTIVE_OP}}</div>
+        </div>
+        <div class="card">
+            <div class="label">队列等待</div>
+            <div class="value">{{QUEUE}}</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 22px;">
+        <h3 class="section-title">最近处罚</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>玩家</th><th>违禁词</th><th>时间</th></tr>
+                </thead>
+                <tbody>
+                {{RECENT_PUNISHMENTS}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">ChatModerator v1.0.0 · 数据目录：{{DATA_DIR}}</div>
+</div>
+</body>
+</html>

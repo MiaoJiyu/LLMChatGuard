@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{SERVER_NAME}} · 处罚记录</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <div class="brand"><span class="dot"></span> ChatModerator · {{SERVER_NAME}}</div>
+    <div class="nav-links">
+        <a href="/">仪表盘</a>
+        <a href="/punishments" class="active">处罚记录</a>
+        <a href="/logs">日志</a>
+        {{LOGIN_STATUS}}
+    </div>
+</nav>
+<div class="container">
+    <h1 class="page-title">处罚记录</h1>
+    <p class="page-sub">查询被系统自动处罚的玩家记录</p>
+
+    <form class="form-row" method="get" action="/punishments">
+        <input type="text" name="player" placeholder="按玩家名搜索" value="{{PLAYER}}">
+        <button type="submit">搜索</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>玩家</th><th>违禁词</th><th>命令</th><th>时间</th></tr>
+                </thead>
+                <tbody>
+                {{ROWS}}
+                </tbody>
+            </table>
+        </div>
+        {{PAGINATION}}
+    </div>
+    <div class="footer">ChatModerator v1.0.0</div>
+</div>
+</body>
+</html>
