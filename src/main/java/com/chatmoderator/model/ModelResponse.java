@@ -21,24 +21,35 @@ public class ModelResponse {
         ModelResponse r = new ModelResponse();
         if (text == null) return r;
         String[] lines = text.split("\\r?\\n");
-        if (lines.length < 2) {
-            return r; // 行数不足，parsed 保持 false
-        }
-        r.isBanned = lines[1].trim().equalsIgnoreCase("true");
-        if (lines.length >= 3) {
-            try {
-                JsonObject o = JsonParser.parseString(lines[2].trim()).getAsJsonObject();
-                JsonArray arr = o.getAsJsonArray("banned_words");
-                if (arr != null) {
-                    for (int i = 0; i < arr.size(); i++) {
-                        r.bannedWords.add(arr.get(i).getAsString());
+        boolean foundBool = false;
+        boolean foundJson = false;
+        for (String raw : lines) {
+            String ln = raw.trim();
+            if (!foundBool && (ln.equalsIgnoreCase("true") || ln.equalsIgnoreCase("false"))) {
+                r.isBanned = ln.equalsIgnoreCase("true");
+                foundBool = true;
+                continue;
+            }
+            if (ln.startsWith("{")) {
+                try {
+                    JsonObject o = JsonParser.parseString(ln).getAsJsonObject();
+                    JsonArray arr = o.getAsJsonArray("banned_words");
+                    if (arr != null) {
+                        for (int i = 0; i < arr.size(); i++) {
+                            r.bannedWords.add(arr.get(i).getAsString());
+                        }
                     }
+                    foundJson = true;
+                } catch (Exception ignored) {
+                    // 非 JSON 行，忽略
                 }
-            } catch (Exception ignored) {
-                // JSON 解析失败，保留 parsed=false
             }
         }
-        r.parsed = true;
+        // 命中状态：明确 True/False 优先；若模型省略布尔行，则由是否含违禁词推断
+        if (foundJson && !foundBool) {
+            r.isBanned = !r.bannedWords.isEmpty();
+        }
+        r.parsed = foundBool || foundJson;
         return r;
     }
 }

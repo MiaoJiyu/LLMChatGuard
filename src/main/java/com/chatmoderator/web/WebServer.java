@@ -168,6 +168,11 @@ public class WebServer extends NanoHTTPD {
     }
 
     private Response doLogin(IHTTPSession session) {
+        // NanoHTTPD 不会自动解析 POST 表单体，必须显式调用 parseBody 才能从 getParms 取到参数
+        try {
+            session.parseBody(new HashMap<>());
+        } catch (Exception ignored) {
+        }
         Map<String, String> parms = session.getParms();
         String user = parms.getOrDefault("username", "");
         String pass = parms.getOrDefault("password", "");

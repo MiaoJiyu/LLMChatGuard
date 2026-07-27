@@ -54,11 +54,17 @@ public class WordFilter {
 
     /** 本地兜底检测：消息标准化（小写）后是否命中任意词（用于 API 失败策略 local）。 */
     public boolean localContains(String message) {
-        if (message == null || message.isEmpty()) return false;
+        return !localMatches(message).isEmpty();
+    }
+
+    /** 本地兜底检测：返回标准化后实际命中的违禁词列表（用于 API 失败策略 local）。 */
+    public List<String> localMatches(String message) {
+        List<String> found = new ArrayList<>();
+        if (message == null || message.isEmpty()) return found;
         String norm = message.toLowerCase().trim();
         for (String w : words) {
-            if (norm.contains(w)) return true;
+            if (norm.contains(w)) found.add(w);
         }
-        return false;
+        return found;
     }
 }

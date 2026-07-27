@@ -108,8 +108,14 @@ public class ModelClient {
         req.addProperty("max_tokens", cfg.maxTokens);
         req.addProperty("temperature", cfg.temperature);
         req.addProperty("top_p", cfg.topP);
-        req.addProperty("top_k", cfg.topK);
-        req.addProperty("thinking", cfg.thinking);
+        // 仅当显式启用时附带 provider 专有参数，避免向不兼容的 API（如 OpenAI）
+        // 发送未知字段导致 HTTP 400，从而使所有检测失效。
+        if (cfg.topK > 0) {
+            req.addProperty("top_k", cfg.topK);
+        }
+        if (cfg.thinking) {
+            req.addProperty("thinking", true);
+        }
         return req.toString();
     }
 

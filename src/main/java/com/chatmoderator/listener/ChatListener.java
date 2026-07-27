@@ -40,9 +40,6 @@ public class ChatListener implements Listener {
         plugin.getLogManager().logChat(p.getName(), msg);
 
         ModeDecider.DetectMode mode = plugin.getModeDecider().decide();
-        plugin.getLogManager().logMode(mode.name(),
-                plugin.getModeDecider().getCachedOnline(),
-                plugin.getModeDecider().getCachedActiveOp());
 
         if (mode == ModeDecider.DetectMode.STOP) {
             return;
@@ -87,9 +84,9 @@ public class ChatListener implements Listener {
     private void handleFailure(Player p, String msg) {
         String policy = plugin.getConfigManager().getFailurePolicy();
         if ("local".equalsIgnoreCase(policy)) {
-            if (plugin.getWordFilter().localContains(msg)) {
-                plugin.getPunishmentExecutor().execute(p,
-                        plugin.getWordFilter().getWords(), msg);
+            List<String> matched = plugin.getWordFilter().localMatches(msg);
+            if (!matched.isEmpty()) {
+                plugin.getPunishmentExecutor().execute(p, matched, msg);
             }
         }
         // pass：放行

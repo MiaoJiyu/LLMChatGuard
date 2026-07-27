@@ -35,6 +35,7 @@ public class ModeDecider {
             }
         }
 
+        DetectMode old = cachedMode;
         DetectMode mode;
         if (activeOp >= 2 || online <= 1) {
             mode = DetectMode.STOP;
@@ -45,6 +46,11 @@ public class ModeDecider {
         } else {
             // 需求未明确覆盖的组合：没有活跃 OP 时偏向全量保护
             mode = (activeOp == 0) ? DetectMode.FULL : DetectMode.SAMPLE;
+        }
+
+        // 仅在检测模式实际切换时记录事件（需求 §7.1：检测模式切换事件）
+        if (old != mode) {
+            plugin.getLogManager().logMode(mode.name(), online, activeOp);
         }
 
         cachedMode = mode;

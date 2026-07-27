@@ -6,7 +6,7 @@
   "max_tokens": 1024,
   "temperature": 0.2,
   "top_p": 1.0,
-  "top_k": 20,
+  "top_k": 0,
   "thinking": false,
   "timeout_seconds": 30,
   "system_prompt_template": ""

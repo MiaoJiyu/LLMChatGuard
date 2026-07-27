@@ -141,13 +141,16 @@ public class ChatModeratorPlugin extends JavaPlugin {
                 configManager.getCustomPromptTemplate(), words);
         sender.sendMessage("§7正在检测玩家 " + playerName + " 的消息...");
         modelClient.analyze(message, sp, cfg).whenComplete((resp, err) -> {
-            if (err != null) {
-                sender.sendMessage("§c检测异常: " + err.getMessage());
-                return;
-            }
-            sender.sendMessage("§a解析成功: " + resp.parsed
-                    + " | 命中: " + resp.isBanned
-                    + " | 违禁词: " + resp.bannedWords);
+            // 回调运行在异步线程，回写消息需切回主线程
+            getServer().getScheduler().runTask(this, () -> {
+                if (err != null) {
+                    sender.sendMessage("§c检测异常: " + err.getMessage());
+                    return;
+                }
+                sender.sendMessage("§a解析成功: " + resp.parsed
+                        + " | 命中: " + resp.isBanned
+                        + " | 违禁词: " + resp.bannedWords);
+            });
         });
     }
 
