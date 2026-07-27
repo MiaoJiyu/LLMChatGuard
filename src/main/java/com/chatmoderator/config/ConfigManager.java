@@ -32,7 +32,9 @@ public class ConfigManager {
     private int webPort = 8080;
     private String webBindAddress = "127.0.0.1";
     private String webAdminUsername = "admin";
-    private String webAdminPassword = "admin123";
+    // 注意：不再提供弱口令默认值。首次启动若未配置 web_admin.password，
+    // Web 面板会在 onEnable 阶段被禁用并要求管理员手动设置（见 ChatModeratorPlugin）。
+    private String webAdminPassword = "";
     private int webAdminSessionTimeoutMinutes = 30;
 
     public ConfigManager(ChatModeratorPlugin plugin) {
@@ -139,6 +141,16 @@ public class ConfigManager {
     public int getMaxConcurrentRequests() { return maxConcurrentRequests; }
     public int getRetryCount() { return retryCount; }
     public String getFailurePolicy() { return failurePolicy; }
+
+    /** 仅允许 pass / local，否则回退为 pass 并记录告警（防止配置被篡改为无效值绕过检测）。 */
+    public String getFailurePolicyChecked() {
+        if ("pass".equalsIgnoreCase(failurePolicy) || "local".equalsIgnoreCase(failurePolicy)) {
+            return failurePolicy.toLowerCase();
+        }
+        plugin.getLogger().warning("无效的 failure_policy: '" + failurePolicy
+                + "'，已回退为 pass（解析失败/超时将放行）");
+        return "pass";
+    }
     public int getLogRetentionDays() { return logRetentionDays; }
     public int getLogArchiveHour() { return logArchiveHour; }
     public int getWebPort() { return webPort; }

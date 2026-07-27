@@ -59,7 +59,7 @@ mvn clean package -DskipTests
 3. 编辑 `models/default.json`，填入真实的 `api_url`、`api_key`、`model_name`。
 4. 按需编辑 `config.yaml`、`banned_words/*.txt`、`prompts/*.txt`。
 5. 在游戏内执行 `/chatmod reload`（或重启服务器）使配置生效。
-6. Web 面板默认 `127.0.0.1:8080`；`web_admin.password` 建议填写 BCrypt 哈希（以 `$2a$`/`$2b$`/`$2y$` 开头）。
+6. Web 面板默认 `127.0.0.1:8080`；`web_admin.password` **留空时 Web 面板不启动**（安全默认）。上线前务必设置强密码，建议使用 BCrypt 哈希（以 `$2a$`/`$2b$`/`$2y$` 开头）。
 
 ---
 
@@ -182,8 +182,9 @@ web_admin:
 | `/static/style.css` | 样式表 |
 
 - 访客：仅可访问处罚记录。
-- 管理员：登录后（BCrypt 校验，`session_timeout_minutes` 过期）可查看全部日志。
-- 生产建议：绑定 `127.0.0.1`，经反向代理 + HTTPS 对外；密码使用 BCrypt 哈希。
+- 管理员：登录后（BCrypt 校验，会话带过期时间并定时清理）可查看全部日志。
+- 安全默认：`web_admin.password` 留空时 Web 面板**不启动**；会话 id 由密码学随机数生成，Cookie 标记 `HttpOnly; SameSite=Lax; Expires=...`；明文密码比对使用定长比较以降低时序侧信道。
+- 生产建议：绑定 `127.0.0.1`，经反向代理 + HTTPS 对外；密码使用 BCrypt 哈希；绑定 `0.0.0.0` 会触发告警。
 
 ---
 
@@ -221,7 +222,7 @@ plugins/ChatModerator/
 
 - **完全不拦截**：确认 `models/default.json` 的 `api_url/key/model_name` 正确；`failure_policy=pass` 时 API 失败会放行，可临时改 `local` 验证。
 - **检测全部失败（HTTP 400）**：多为向 OpenAI 发送了 `top_k`/`thinking` 等未知字段，保持 `top_k: 0` 与 `thinking: false` 即可。
-- **管理员无法登录**：确认 `web_admin.password` 为明文（首次）或正确 BCrypt 哈希；端口 `web_port` 未被占用、绑定地址可达。
+- **管理员无法登录**：确认 `web_admin.password` 已设置（留空时面板不启动）；为明文或正确 BCrypt 哈希；端口 `web_port` 未被占用、绑定地址可达。
 - **日志爆量**：已将模式日志记录收敛到「仅切换时」；聊天日志按设计全量记录。
 - **词库不生效**：确认 `banned_words/*.txt` 每行一词；`/chatmod reload` 后生效。
 

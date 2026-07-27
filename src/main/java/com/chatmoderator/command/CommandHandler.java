@@ -2,6 +2,7 @@ package com.chatmoderator.command;
 
 import com.chatmoderator.ChatModeratorPlugin;
 import org.bukkit.command.Command;
+import org.bukkit.entity.Player;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
@@ -37,6 +38,11 @@ public class CommandHandler implements CommandExecutor {
                 plugin.printStatus(sender);
                 return true;
             case "test":
+                // 仅 OP 可使用（控制台除外），防止非 OP 滥用大模型/探测提示词
+                if (sender instanceof Player && !((Player) sender).isOp()) {
+                    sender.sendMessage("§c需要 OP 权限");
+                    return true;
+                }
                 if (args.length < 3) {
                     sender.sendMessage("§c用法: /chatmod test <玩家名> <消息内容>");
                     return true;

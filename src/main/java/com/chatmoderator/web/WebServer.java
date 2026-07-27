@@ -26,6 +26,10 @@ public class WebServer extends NanoHTTPD {
         super(host, port);
         this.plugin = plugin;
         this.sessions = new SessionManager(plugin);
+        if (host == null || host.isEmpty() || "0.0.0.0".equals(host)) {
+            plugin.getLogger().warning("Web 面板绑定在所有网络接口 (0.0.0.0)，存在公网暴露风险！"
+                    + " 建议改用 127.0.0.1 并经反向代理 + HTTPS 暴露，且务必配置强 BCrypt 密码。");
+        }
     }
 
     public SessionManager getSessions() {
@@ -168,10 +172,12 @@ public class WebServer extends NanoHTTPD {
     }
 
     private Response doLogin(IHTTPSession session) {
-        // NanoHTTPD 不会自动解析 POST 表单体，必须显式调用 parseBody 才能从 getParms 取到参数
+        // NanoHTTPD 不会自动解析 POST 表单体，仅对登录接口按需解析并限制体积，避免吞掉异常掩盖故障
         try {
-            session.parseBody(new HashMap<>());
-        } catch (Exception ignored) {
+            Map<String, String> files = new HashMap<>();
+            session.parseBody(files);
+        } catch (Exception e) {
+            plugin.getLogger().warning("解析登录请求体失败: " + e.getMessage());
         }
         Map<String, String> parms = session.getParms();
         String user = parms.getOrDefault("username", "");
@@ -179,8 +185,12 @@ public class WebServer extends NanoHTTPD {
         if (sessions.login(user, pass)) {
             String id = sessions.createSession();
             Response r = redirect("/");
-            r.addHeader("Set-Cookie", "cm_sid=" + id + "; Path=/; HttpOnly; Max-Age="
-                    + (plugin.getConfigManager().getWebAdminSessionTimeoutMinutes() * 60));
+            // 使用 Expires（RFC1123）设置过期时间，兼容所有客户端；同时 HttpOnly 防脚本读取
+            long expireMs = System.currentTimeMillis()
+                    + (long) plugin.getConfigManager().getWebAdminSessionTimeoutMinutes() * 60_000;
+            String expires = new java.text.SimpleDateFormat(
+                    "EEE, dd MMM yyyy HH:mm:ss z", java.util.Locale.US).format(new Date(expireMs));
+            r.addHeader("Set-Cookie", "cm_sid=" + id + "; Path=/; HttpOnly; SameSite=Lax; Expires=" + expires);
             return r;
         }
         Map<String, String> p = new HashMap<>();

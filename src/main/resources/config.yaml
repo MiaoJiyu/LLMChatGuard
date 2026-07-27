@@ -31,5 +31,7 @@ web_port: 8080
 web_bind_address: "127.0.0.1"
 web_admin:
   username: "admin"
-  password: "admin123"   # 建议使用 BCrypt 哈希（以 $2a$/$2b$/$2y$ 开头），明文也可
+  # 留空则 Web 面板不启动（安全默认）。上线前务必设置强密码。
+  # 建议使用 BCrypt 哈希（以 $2a$/$2b$/$2y$ 开头），明文也可但风险更高。
+  password: ""
   session_timeout_minutes: 30

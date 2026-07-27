@@ -39,7 +39,7 @@ cp target/ChatModerator.jar <你的服务端>/plugins/
 ## 4. 维护词库与密码
 
 - 编辑 `plugins/ChatModerator/banned_words/base.txt`，每行一个违禁词。
-- 设置 `config.yaml` 中的 `web_admin.password`（建议 BCrypt 哈希，以 `$2a$` 开头）。
+- 设置 `config.yaml` 中的 `web_admin.password`（建议 BCrypt 哈希，以 `$2a$` 开头）。**留空则 Web 面板不启动**（安全默认），上线前务必填写。
 - 自定义检测逻辑可改 `prompts/default_prompt.txt`，**保留 `{{BANNED_WORDS_JSON}}` 占位符**。
 
 ## 5. 生效与验证

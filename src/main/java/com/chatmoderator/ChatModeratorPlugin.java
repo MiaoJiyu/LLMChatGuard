@@ -76,13 +76,19 @@ public class ChatModeratorPlugin extends JavaPlugin {
 
         // 启动 Web 面板（端口为 0 时禁用）
         if (configManager.getWebPort() != 0) {
-            try {
-                webServer = new WebServer(this, configManager.getWebBindAddress(), configManager.getWebPort());
-                webServer.start();
-                getLogger().info("Web 管理面板已启动: http://" + configManager.getWebBindAddress()
-                        + ":" + configManager.getWebPort());
-            } catch (IOException e) {
-                getLogger().warning("Web 管理面板启动失败: " + e.getMessage());
+            String pw = configManager.getWebAdminPassword();
+            if (pw == null || pw.isEmpty()) {
+                getLogger().warning("未配置 web_admin.password，Web 管理面板已禁用。"
+                        + "请在 config.yaml 中设置强密码（建议 BCrypt 哈希）后 /chatmod reload。");
+            } else {
+                try {
+                    webServer = new WebServer(this, configManager.getWebBindAddress(), configManager.getWebPort());
+                    webServer.start();
+                    getLogger().info("Web 管理面板已启动: http://" + configManager.getWebBindAddress()
+                            + ":" + configManager.getWebPort());
+                } catch (IOException e) {
+                    getLogger().warning("Web 管理面板启动失败: " + e.getMessage());
+                }
             }
         }
 

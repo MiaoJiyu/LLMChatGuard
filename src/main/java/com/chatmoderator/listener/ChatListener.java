@@ -82,7 +82,7 @@ public class ChatListener implements Listener {
     }
 
     private void handleFailure(Player p, String msg) {
-        String policy = plugin.getConfigManager().getFailurePolicy();
+        String policy = plugin.getConfigManager().getFailurePolicyChecked();
         if ("local".equalsIgnoreCase(policy)) {
             List<String> matched = plugin.getWordFilter().localMatches(msg);
             if (!matched.isEmpty()) {
