@@ -167,6 +167,7 @@ public class WebServer extends NanoHTTPD {
         p.put("LOGIN_STATUS", loginStatus(true));
         p.put("TYPE_ALL", type.isEmpty() ? "selected" : "");
         p.put("TYPE_CHAT", "chat".equals(type) ? "selected" : "");
+        p.put("TYPE_BYPASS", "bypass".equals(type) ? "selected" : "");
         p.put("TYPE_DETECTION", "detection".equals(type) ? "selected" : "");
         p.put("TYPE_MODE", "mode".equals(type) ? "selected" : "");
         p.put("TYPE_PUNISHMENT", "punishment".equals(type) ? "selected" : "");

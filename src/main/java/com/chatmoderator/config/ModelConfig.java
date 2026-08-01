@@ -44,6 +44,10 @@ public class ModelConfig {
     @SerializedName("thinking_param")
     public String thinkingParam = "thinking";
 
+    /** 是否请求 JSON 结构化输出（OpenAI/SiliconFlow/DeepSeek 均支持 response_format={"type":"json_object"}）。 */
+    @SerializedName("json_mode")
+    public boolean jsonMode = true;
+
     @SerializedName("rpm")
     public int rpm = 20;
 

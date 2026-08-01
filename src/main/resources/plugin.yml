@@ -2,9 +2,9 @@ name: ChatModerator
 main: com.chatmoderator.ChatModeratorPlugin
 version: 1.0.0
 api-version: "1.21"
-author: ChatModerator
+author: MiaoJiyu
 description: LLM-powered Minecraft chat moderation with customizable prompts
-website: https://github.com/chatmoderator/LLMChatGuard
+website: https://github.com/MiaoJiyu/LLMChatGuard
 
 commands:
   chatmod:
@@ -16,3 +16,6 @@ permissions:
   chatmoderator.admin:
     description: Access to ChatModerator management commands
     default: op
+  chatmod.bypass:
+    description: 拥有该权限的玩家聊天不被检测（仍会记录到日志）
+    default: false

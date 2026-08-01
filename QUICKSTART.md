@@ -31,7 +31,8 @@ cp target/ChatModerator.jar <你的服务端>/plugins/
   "top_k": 0,
   "thinking": false,
   "timeout_seconds": 120,
-  "stream": false
+  "stream": false,
+  "json_mode": true
 }
 ```
 

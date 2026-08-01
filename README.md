@@ -142,6 +142,7 @@ web_admin:
 - `top_k`：仅当 **> 0** 时才会发送到 API（OpenAI 等不接受该字段，留 0 即不发送）。
 - `thinking`：仅当 **true** 时发送思考开关（推理模型专用）。
 - `thinking_param`：思考参数的**真实字段名**，因提供方而异。OpenAI/DeepSeek 用 `thinking`；**SiliconFlow（如 Qwen3）用 `enable_thinking`**。配错会导致 HTTP 400，服务端拒绝时本插件会自动降级（移除该参数后重试）。
+- `json_mode`：为 **true** 时在请求中附带 `response_format: {"type":"json_object"}`，强制模型返回结构化 JSON（与内置提示词的 `results` 输出格式对应）。提供方不支持时自动降级移除。
 - `timeout_seconds`：非流式下约束整次响应；流式下仅约束连接与首字节，主体按"空闲超时"读取，因此慢模型请开启 `stream: true` 并视情况调大此值。
 - `system_prompt_template`：可选；不填则回退到 `config.yaml` 的 `custom_prompt_template`，再不填用内置默认提示词。
 

@@ -56,6 +56,11 @@ public class LogManager {
         enqueue("chat", player, null, message);
     }
 
+    /** 记录被 chatmod.bypass 豁免检测的聊天（仍保留消息内容以便审计）。 */
+    public void logBypass(String player, String message) {
+        enqueue("bypass", player, null, message);
+    }
+
     public void logDetection(String player, String message, boolean banned, List<String> words) {
         enqueue("detection", player, banned,
                 "banned=" + banned + " words=" + words + " message=" + message);

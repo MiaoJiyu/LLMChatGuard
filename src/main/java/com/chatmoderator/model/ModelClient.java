@@ -77,6 +77,7 @@ public class ModelClient {
         Exception lastErr = null;
         boolean allowThinking = cfg.thinking;
         boolean allowStream = cfg.stream;
+        boolean allowJson = cfg.jsonMode;
         for (int i = 0; i < attempts; i++) {
             try {
                 semaphore.acquire();
@@ -85,15 +86,33 @@ public class ModelClient {
                 return new ModelResponse(); // parsed=false
             }
             try {
-                String body = buildRequest(message, systemPrompt, cfg, allowThinking, allowStream);
+                String body = buildRequest(message, systemPrompt, cfg, allowThinking, allowStream, allowJson);
                 String text = sendRequest(body, cfg, allowStream);
                 return ModelResponse.parse(text);
             } catch (ModelHttpException e) {
-                // 4xx：服务端拒绝某可选参数（thinking/stream），逐级降级后重试（不消耗重试次数）
-                if (allowThinking) { allowThinking = false; i--; continue; }
+                // 4xx：服务端拒绝某可选参数，逐级降级后重试（不消耗重试次数）
+                if (allowThinking) {
+                    plugin.getLogger().warning("thinking 被服务端拒绝（HTTP " + e.getMessage()
+                            + "），已退回不 thinking 重试");
+                    allowThinking = false; i--; continue;
+                }
                 if (allowStream) { allowStream = false; i--; continue; }
+                if (allowJson) { allowJson = false; i--; continue; }
                 lastErr = e;
             } catch (Exception e) {
+                // 任意失败（超时/网络/空响应等）：若本次带了 thinking，先退回不 thinking 重试一次
+                if (e instanceof EmptyResponseException) {
+                    plugin.getLogger().warning("模型返回空响应，正在重试（剩余 "
+                            + (attempts - i - 1) + " 次）");
+                    lastErr = e;
+                    // 不降级 thinking，仅走普通重试（注意：i 自增进入下一轮）
+                    continue;
+                }
+                if (allowThinking) {
+                    plugin.getLogger().warning("thinking 请求失败（" + e.getClass().getSimpleName()
+                            + "），已退回不 thinking 重试");
+                    allowThinking = false; i--; continue;
+                }
                 lastErr = e;
                 // 进入下一次重试
             } finally {
@@ -111,6 +130,7 @@ public class ModelClient {
         Exception lastErr = null;
         boolean allowThinking = cfg.thinking;
         boolean allowStream = cfg.stream;
+        boolean allowJson = cfg.jsonMode;
         for (int i = 0; i < attempts; i++) {
             try {
                 semaphore.acquire();
@@ -119,14 +139,30 @@ public class ModelClient {
                 return emptyResults(messageLines.size());
             }
             try {
-                String body = buildBatchRequest(systemPrompt, messageLines, cfg, allowThinking, allowStream);
+                String body = buildBatchRequest(systemPrompt, messageLines, cfg, allowThinking, allowStream, allowJson);
                 String text = sendRequest(body, cfg, allowStream);
                 return ModelResponse.parseBatch(text, messageLines.size());
             } catch (ModelHttpException e) {
-                if (allowThinking) { allowThinking = false; i--; continue; }
+                if (allowThinking) {
+                    plugin.getLogger().warning("thinking 被服务端拒绝（HTTP " + e.getMessage()
+                            + "），已退回不 thinking 重试");
+                    allowThinking = false; i--; continue;
+                }
                 if (allowStream) { allowStream = false; i--; continue; }
+                if (allowJson) { allowJson = false; i--; continue; }
                 lastErr = e;
             } catch (Exception e) {
+                if (e instanceof EmptyResponseException) {
+                    plugin.getLogger().warning("批量模型返回空响应，正在重试（剩余 "
+                            + (attempts - i - 1) + " 次）");
+                    lastErr = e;
+                    continue;
+                }
+                if (allowThinking) {
+                    plugin.getLogger().warning("thinking 请求失败（" + e.getClass().getSimpleName()
+                            + "），已退回不 thinking 重试");
+                    allowThinking = false; i--; continue;
+                }
                 lastErr = e;
             } finally {
                 semaphore.release();
@@ -139,6 +175,11 @@ public class ModelClient {
     /** 模型返回 HTTP 4xx（参数/鉴权类错误）时抛出，用于触发可选参数的自动降级。 */
     private static final class ModelHttpException extends RuntimeException {
         ModelHttpException(String msg) { super(msg); }
+    }
+
+    /** 响应体为空/结构无法识别（多因服务端限流或负载高返回空体），视为可重试瞬时失败。 */
+    private static final class EmptyResponseException extends RuntimeException {
+        EmptyResponseException(String msg) { super(msg); }
     }
 
     private static List<ModelResponse> emptyResults(int n) {
@@ -181,7 +222,18 @@ public class ModelClient {
                     + "；响应=" + truncate(respBody, 800));
             throw new ModelHttpException("HTTP " + resp.statusCode() + " " + respBody);
         }
-        return extractContent(resp.body());
+        String raw = resp.body();
+        String content = extractContent(raw);
+        if (content == null || content.isEmpty()) {
+            // 响应体为空或结构无法识别——明确打印原始 body 与状态码，便于区分
+            // "服务端返回空体（限流/负载）" 与 "返回结构非 OpenAI 标准"。
+            plugin.getLogger().warning("模型返回内容为空（HTTP " + resp.statusCode()
+                    + "，body 长度=" + (raw == null ? 0 : raw.length())
+                    + "）；原始响应(截断)=" + truncate(raw, 1500));
+            // 视为可重试的瞬时失败（NIM 限流/负载高时常返回空体），交由调用方重试。
+            throw new EmptyResponseException("empty body / unrecognized structure (HTTP " + resp.statusCode() + ")");
+        }
+        return content;
     }
 
     /**
@@ -277,8 +329,15 @@ public class ModelClient {
         return (cfg.thinkingParam == null || cfg.thinkingParam.isEmpty()) ? "thinking" : cfg.thinkingParam;
     }
 
+    /** 附加结构化 JSON 输出要求：response_format = {"type":"json_object"}。 */
+    private static void addJsonResponseFormat(JsonObject req) {
+        JsonObject rf = new JsonObject();
+        rf.addProperty("type", "json_object");
+        req.add("response_format", rf);
+    }
+
     private String buildRequest(String message, String systemPrompt, ModelConfig cfg,
-                                 boolean allowThinking, boolean allowStream) {
+                                 boolean allowThinking, boolean allowStream, boolean allowJson) {
         JsonObject req = new JsonObject();
         req.addProperty("model", cfg.modelName);
         JsonArray msgs = new JsonArray();
@@ -305,11 +364,14 @@ public class ModelClient {
         if (allowStream) {
             req.addProperty("stream", true);
         }
+        if (allowJson) {
+            addJsonResponseFormat(req);
+        }
         return req.toString();
     }
 
     private String buildBatchRequest(String systemPrompt, List<String> messageLines, ModelConfig cfg,
-                                     boolean allowThinking, boolean allowStream) {
+                                     boolean allowThinking, boolean allowStream, boolean allowJson) {
         JsonObject req = new JsonObject();
         req.addProperty("model", cfg.modelName);
         JsonArray msgs = new JsonArray();
@@ -321,8 +383,8 @@ public class ModelClient {
         StringBuilder sb = new StringBuilder();
         sb.append("请逐条审查以下 ").append(messageLines.size())
                 .append(" 条玩家聊天消息是否包含违禁词。\n");
-        sb.append("直接返回一个 JSON 数组（不要任何额外文字、不要代码块标记），数组长度与消息数一致，顺序一一对应。\n");
-        sb.append("每个元素格式：{\"banned\": true/false, \"banned_words\": [\"词1\"]}\n\n");
+        sb.append("必须仅返回一个合法的 JSON 对象，结构为 {\"results\": [ ... ]}，不要任何额外文字、Markdown 或代码块标记。\n");
+        sb.append("results 数组长度与消息数一致、顺序一一对应，每个元素格式：{\"line_number\": 行号, \"triggered\": true/false, \"banned_words\": [\"命中的原始违禁词\"]}。\n\n");
         sb.append("消息列表：\n");
         for (int i = 0; i < messageLines.size(); i++) {
             sb.append((i + 1)).append(") ").append(messageLines.get(i)).append("\n");
@@ -343,17 +405,44 @@ public class ModelClient {
         if (allowStream) {
             req.addProperty("stream", true);
         }
+        if (allowJson) {
+            addJsonResponseFormat(req);
+        }
         return req.toString();
     }
 
     private String extractContent(String body) {
+        if (body == null || body.isEmpty()) return "";
         try {
             JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+            // 1) 标准 OpenAI：choices[0].message.content
             JsonArray choices = root.getAsJsonArray("choices");
             if (choices != null && choices.size() > 0) {
-                JsonObject msg = choices.get(0).getAsJsonObject()
-                        .getAsJsonObject("message");
-                return msg.get("content").getAsString();
+                JsonObject c0 = choices.get(0).getAsJsonObject();
+                JsonObject msg = c0.has("message") ? c0.getAsJsonObject("message") : null;
+                if (msg != null && msg.has("content")) {
+                    JsonElement c = msg.get("content");
+                    if (c != null && c.isJsonPrimitive()) return c.getAsString();
+                }
+                // 兼容部分实现把 content 直接放在 choice 上
+                if (c0.has("content")) {
+                    JsonElement c = c0.get("content");
+                    if (c != null && c.isJsonPrimitive()) return c.getAsString();
+                }
+            }
+            // 2) 兼容 NVIDIA NIM / 某些实现的 output 字段
+            if (root.has("output")) {
+                JsonElement out = root.get("output");
+                if (out.isJsonPrimitive()) return out.getAsString();
+                if (out.isJsonObject() && out.getAsJsonObject().has("content")) {
+                    JsonElement c = out.getAsJsonObject().get("content");
+                    if (c != null && c.isJsonPrimitive()) return c.getAsString();
+                }
+            }
+            // 3) 兼容顶层直接带 content 字段
+            if (root.has("content")) {
+                JsonElement c = root.get("content");
+                if (c != null && c.isJsonPrimitive()) return c.getAsString();
             }
         } catch (Exception ignored) {
             // 返回空串，交由解析逻辑处理

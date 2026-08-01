@@ -16,6 +16,9 @@ import java.util.Random;
  */
 public class ChatListener implements Listener {
 
+    /** 豁免权限：拥有该权限的玩家对话不被检测，但仍记录到日志。 */
+    public static final String BYPASS_PERMISSION = "chatmod.bypass";
+
     private final ChatModeratorPlugin plugin;
     private final Random random = new Random();
 
@@ -36,6 +39,13 @@ public class ChatListener implements Listener {
         plugin.getAfkManager().update(p);
         // 记录原始消息（无论是否检测）
         plugin.getLogManager().logChat(p.getName(), msg);
+
+        // 豁免权限：拥有 chatmod.bypass 的玩家不被检测（即便调试模式也豁免），
+        // 但聊天已记录到日志，此处再补一条 bypass 标记便于审计区分"豁免"与"漏检"。
+        if (p.hasPermission(BYPASS_PERMISSION)) {
+            plugin.getLogManager().logBypass(p.getName(), msg);
+            return;
+        }
 
         // 调试模式：无视不检测条件，逐条立即检测
         if (plugin.getConfigManager().isDebug()) {
